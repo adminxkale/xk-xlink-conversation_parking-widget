@@ -1,0 +1,211 @@
+# Plan de Implementación: Conversation Parking Widget
+
+## Visión General
+
+Implementación incremental del widget de parqueo de conversaciones para Genesys Cloud siguiendo Clean Architecture. Se construyen primero la capa de dominio (entidades + puertos), luego infraestructura (servicios mock, adapters), seguida de la capa de aplicación (casos de uso + hooks), los componentes de presentación, las rutas API proxy, y finalmente la integración completa. TypeScript, Next.js 16 App Router, React 19, Tailwind CSS 4, Vitest + React Testing Library + fast-check + MSW.
+
+## Tareas
+
+- [x] 1. Configurar estructura Clean Architecture, entidades y puertos (Domain Layer)
+  - [x] 1.1 Crear entidades del dominio
+    - Crear `src/domain/entities/interaction.ts` con la interfaz `Interaction`
+    - Crear `src/domain/entities/line.ts` con la interfaz `Line`
+    - Crear `src/domain/entities/auth.ts` con la interfaz `AuthState`
+    - Crear `src/domain/entities/send-template.ts` con `SendTemplateRequest` y `SendTemplateResponse`
+    - _Requisitos: 3.2, 2.3, 1.1, 7.1_
+  - [x] 1.2 Crear puertos (interfaces de servicio)
+    - Crear `src/domain/ports/interaction-service.port.ts` con la interfaz `InteractionService`
+    - Crear `src/domain/ports/template-service.port.ts` con la interfaz `TemplateService`
+    - _Requisitos: 3.1, 3.4, 7.1_
+  - [x] 1.3 Configurar entorno de testing (Vitest + RTL + fast-check + MSW)
+    - Instalar dependencias de testing: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`, `fast-check`, `msw`
+    - Crear `vitest.config.ts` con configuración para React y jsdom
+    - Crear setup file para testing library
+    - _Requisitos: Infraestructura de testing_
+
+- [x] 2. Implementar capa de infraestructura (Infrastructure Layer)
+  - [x] 2.1 Implementar servicio mock de interacciones
+    - Crear `src/infrastructure/services/mock-interaction.service.ts` implementando el puerto `InteractionService` con datos simulados (interacciones parqueadas y no parqueadas)
+    - _Requisitos: 3.2, 3.3_
+  - [x] 2.2 Crear registro de servicios (inversión de dependencias)
+    - Crear `src/infrastructure/config/service-registry.ts` como punto de entrada único para intercambiar mock/real con un solo cambio de configuración
+    - _Requisitos: 3.4_
+  - [x] 2.3 Implementar adapter de autenticación Genesys
+    - Crear `src/infrastructure/adapters/genesys-auth.adapter.ts` con funciones `extractToken` (buscar token en hash, query params, localStorage) y `validateToken` (llamar a `/api/v2/users/me`)
+    - _Requisitos: 1.1, 1.2, 1.4_
+  - [x] 2.4 Implementar adapter de líneas del agente
+    - Crear `src/infrastructure/adapters/lines.adapter.ts` con funciones `fetchGroupPhones` y `fetchChannels` (fallback)
+    - _Requisitos: 2.2, 2.8_
+  - [x] 2.5 Implementar servicio de plantillas
+    - Crear `src/infrastructure/services/template.service.ts` implementando el puerto `TemplateService` que llama a `/api/send-template`
+    - _Requisitos: 6.2, 7.1_
+  - [x] 2.6 Escribir test de propiedad para completitud de datos del mock
+    - **Propiedad 3: Completitud de datos de interacción**
+    - Verificar que toda interacción del mock contiene `id`, `originLine`, `destinationLine`, `startTimestamp` (ISO 8601 válido) e `isParked` (booleano)
+    - **Valida: Requisito 3.2**
+
+- [x] 3. Implementar casos de uso y hooks (Application Layer)
+  - [x] 3.1 Implementar caso de uso de consolidación de líneas
+    - Crear `src/application/use-cases/consolidate-lines.ts` con función `consolidateLines` que reciba arrays de líneas de múltiples grupos y elimine duplicados por `phone_number`
+    - _Requisitos: 2.3_
+  - [x] 3.2 Escribir test de propiedad para deduplicación de líneas
+    - **Propiedad 2: Deduplicación de líneas del agente**
+    - Generar listas aleatorias de grupos con phone_numbers potencialmente duplicados
+    - Verificar que el resultado no contiene duplicados y cada `phone_number` aparece exactamente una vez
+    - **Valida: Requisito 2.3**
+  - [x] 3.3 Implementar casos de uso de parqueo
+    - Crear `src/application/use-cases/park-interaction.ts` y `unpark-interaction.ts` que operen sobre el puerto `InteractionService`
+    - Crear `src/application/use-cases/get-interactions.ts` para obtener interacciones filtradas por línea
+    - _Requisitos: 5.1, 6.1, 6.2, 3.1_
+  - [x] 3.4 Escribir test de propiedad para round-trip de parqueo
+    - **Propiedad 6: Round-trip del estado de parqueo**
+    - Generar interacciones aleatorias con `isParked` aleatorio
+    - Verificar que toggle cambia estado y doble toggle restaura valor original
+    - **Valida: Requisitos 5.1, 6.1**
+  - [x] 3.5 Implementar hook `useAuth`
+    - Crear `src/application/hooks/useAuth.ts` que use el adapter de autenticación Genesys para: buscar token → validar → obtener grupos del agente → redirigir si no hay token
+    - Usar variables de entorno `NEXT_PUBLIC_GENESYS_CLIENT_ID` y `NEXT_PUBLIC_GENESYS_ENVIRONMENT`
+    - _Requisitos: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1_
+  - [x] 3.6 Escribir test de propiedad para extracción de token
+    - **Propiedad 1: Extracción de token desde múltiples fuentes**
+    - Generar combinaciones aleatorias de presencia/ausencia de token en hash, query y localStorage
+    - Verificar que retorna token si existe en al menos una fuente, y `null` si no existe en ninguna
+    - **Valida: Requisito 1.1**
+  - [x] 3.7 Implementar hook `useAgentLines`
+    - Crear `src/application/hooks/useAgentLines.ts` que use el adapter de líneas para consultar phones por grupo, fallback a channels, auto-seleccionar primera línea
+    - Usar caso de uso `consolidateLines` para deduplicación
+    - _Requisitos: 2.1, 2.2, 2.3, 2.4, 2.7, 2.8_
+  - [x] 3.8 Implementar hook `useInteractions`
+    - Crear `src/application/hooks/useInteractions.ts` que consuma casos de uso vía puertos para obtener interacciones filtradas por línea seleccionada
+    - Implementar `togglePark` que use los casos de uso de park/unpark y dispare envío de plantilla al desparquear
+    - Implementar `retry` para reintentar obtención tras error
+    - _Requisitos: 3.1, 3.5, 5.1, 6.1, 6.2_
+  - [x] 3.9 Implementar hook `useDurationTimer`
+    - Crear `src/application/hooks/useDurationTimer.ts` que calcule duración en tiempo real desde un timestamp ISO 8601
+    - Retornar string en formato `HH:MM:SS`, actualizar cada segundo
+    - _Requisitos: 4.2_
+  - [x] 3.10 Escribir test de propiedad para cálculo de duración
+    - **Propiedad 5: Cálculo correcto de duración**
+    - Generar pares de timestamps aleatorios donde `ahora >= inicio`
+    - Verificar formato `HH:MM:SS` y que el valor numérico en segundos sea correcto
+    - **Valida: Requisito 4.2**
+
+- [x] 4. Checkpoint — Verificar que todos los tests pasan
+  - Asegurar que todos los tests pasan, preguntar al usuario si surgen dudas.
+
+- [x] 5. Implementar rutas API proxy (Framework Layer)
+  - [x] 5.1 Implementar Route Handler `POST /api/send-template`
+    - Crear `app/api/send-template/route.ts` con handler POST
+    - Validar campos requeridos (`destinationLine`, `conversationId`), retornar 400 si faltan
+    - Construir Basic Auth desde `BASIC_AUTH_USER` y `BASIC_AUTH_PASS`
+    - Proxy al endpoint externo de Infobip
+    - Retornar errores apropiados (400, 502, 504)
+    - _Requisitos: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
+  - [x] 5.2 Escribir test de propiedad para construcción de Basic Auth
+    - **Propiedad 7: Construcción correcta de credenciales Basic Auth**
+    - Generar pares aleatorios de usuario/contraseña
+    - Verificar que el header es exactamente `"Basic " + base64(usuario + ":" + contraseña)`
+    - **Valida: Requisito 7.3**
+  - [x] 5.3 Escribir test de propiedad para validación de body incompleto
+    - **Propiedad 8: Validación rechaza bodies incompletos**
+    - Generar subconjuntos propios aleatorios de los campos requeridos
+    - Verificar respuesta HTTP 400 con mensaje de campos faltantes
+    - **Valida: Requisito 7.5**
+  - [x] 5.4 Implementar Route Handler `GET /api/proxy-group-phones`
+    - Crear `app/api/proxy-group-phones/route.ts` que reciba `group_id` como query param
+    - Consultar números de teléfono asociados al grupo
+    - _Requisitos: 2.2_
+  - [x] 5.5 Implementar Route Handler `GET /api/proxy-channels`
+    - Crear `app/api/proxy-channels/route.ts` como fallback
+    - Retornar lista de canales con `phone_number` y `name`
+    - _Requisitos: 2.8_
+  - [x] 5.6 Escribir tests unitarios para rutas API proxy
+    - Test: error 400 con campos faltantes en send-template
+    - Test: error 502 al fallar endpoint externo
+    - Test: proxy-group-phones retorna phones del grupo
+    - _Requisitos: 7.4, 7.5_
+
+- [x] 6. Checkpoint — Verificar que todos los tests pasan
+  - Asegurar que todos los tests pasan, preguntar al usuario si surgen dudas.
+
+- [x] 7. Implementar componentes de UI (Presentation Layer)
+  - [x] 7.1 Implementar `AuthProvider` y contexto de autenticación
+    - Crear `src/presentation/providers/AuthContext.tsx` con React Context para autenticación
+    - Crear `src/presentation/components/AuthProvider.tsx` como Client Component (`"use client"`) que usa `useAuth` y provee contexto
+    - _Requisitos: 1.1, 1.2, 1.3_
+  - [x] 7.2 Implementar componente `Header`
+    - Crear `src/presentation/components/Header.tsx` como Client Component
+    - Mostrar logo Xlink (`/images/xlink_logo_v2.png`) con `alt="Xlink logo"`
+    - Mostrar título "Conversation Parking"
+    - Soporte para modo oscuro y claro
+    - _Requisitos: 8.1, 8.2, 8.3, 8.4_
+  - [x] 7.3 Implementar componentes `SkeletonLoader`, `ErrorMessage` y `EmptyState`
+    - Crear `src/presentation/components/SkeletonLoader.tsx` con animación shimmer y prop `count`
+    - Crear `src/presentation/components/ErrorMessage.tsx` con mensaje descriptivo y botón de reintento
+    - Crear `src/presentation/components/EmptyState.tsx` con mensaje de no hay interacciones
+    - _Requisitos: 4.4, 4.5, 10.2, 10.3, 10.4, 3.5_
+  - [x] 7.4 Implementar componente `LineSelector`
+    - Crear `src/presentation/components/LineSelector.tsx` como Client Component
+    - Dropdown con las líneas del agente, estado de carga, callback `onSelect`
+    - _Requisitos: 2.5, 2.6, 2.7_
+  - [x] 7.5 Implementar componentes `ParkToggleButton` e `InteractionCard`
+    - Crear `src/presentation/components/ParkToggleButton.tsx` con estados parqueado/no parqueado, indicador de carga, aria-label descriptivo
+    - Crear `src/presentation/components/InteractionCard.tsx` que muestre línea de origen, destino, duración (usando `useDurationTimer`), estado de parqueo
+    - Diferenciación visual con colores semánticos para parqueado vs no parqueado
+    - Transición visual de 150-300ms al cambiar estado
+    - Área de toque mínima 44x44px en botones
+    - _Requisitos: 4.1, 4.3, 5.1, 5.2, 5.3, 6.3, 6.4, 6.5, 9.1, 9.2, 9.3, 9.4_
+  - [x] 7.6 Escribir test de propiedad para renderizado de tarjeta
+    - **Propiedad 4: Renderizado completo de datos en tarjeta de interacción**
+    - Generar interacciones aleatorias válidas
+    - Verificar que el DOM contiene línea de origen, destino, duración e indicador de parqueo
+    - **Valida: Requisito 4.1**
+  - [x] 7.7 Escribir test de propiedad para aria-labels en elementos interactivos
+    - **Propiedad 9: Presencia de aria-labels en elementos interactivos**
+    - Generar interacciones aleatorias válidas
+    - Verificar que todos los botones tienen `aria-label` no vacío y descriptivo
+    - **Valida: Requisito 9.3**
+  - [x] 7.8 Escribir tests unitarios para componentes de UI
+    - Test: logo Xlink presente con alt correcto en Header
+    - Test: título "Conversation Parking" visible en Header
+    - Test: skeleton loader durante carga
+    - Test: mensaje de estado vacío
+    - Test: mensaje de error con botón de reintento
+    - Test: diferenciación visual parqueada/no parqueada en InteractionCard
+    - Test: indicador de carga durante envío en InteractionCard
+    - Test: renderizado de opciones en LineSelector
+    - Test: "Cargando líneas..." durante carga de líneas
+    - _Requisitos: 4.1, 4.3, 4.4, 4.5, 8.1, 8.2, 8.3, 10.2, 10.3_
+
+- [x] 8. Integración y cableado final
+  - [x] 8.1 Implementar componentes `InteractionList` y `ConversationParkingWidget`
+    - Crear `src/presentation/components/InteractionList.tsx` que gestione estados carga/error/vacío/datos
+    - Crear `src/presentation/components/ConversationParkingWidget.tsx` que orqueste Header + LineSelector + InteractionList
+    - Conectar todos los hooks (`useAuth`, `useAgentLines`, `useInteractions`) vía service registry
+    - _Requisitos: 4.1, 4.4, 4.5, 10.1, 10.2_
+  - [x] 8.2 Actualizar `app/page.tsx` y `app/layout.tsx`
+    - Reemplazar contenido de `page.tsx` con `AuthProvider` + `ConversationParkingWidget`
+    - Actualizar metadata en `layout.tsx` (título, descripción)
+    - Configurar soporte de modo oscuro/claro con variables CSS
+    - Asegurar diseño responsivo para contexto embebido en Genesys Cloud
+    - _Requisitos: 4.6, 9.5, 10.1_
+  - [x] 8.3 Crear archivo `.env.local.example` con variables de entorno requeridas
+    - Documentar: `NEXT_PUBLIC_GENESYS_CLIENT_ID`, `NEXT_PUBLIC_GENESYS_ENVIRONMENT`, `BASIC_AUTH_USER`, `BASIC_AUTH_PASS`
+    - _Requisitos: 1.6, 7.3_
+  - [x] 8.4 Escribir tests de integración
+    - Test: flujo completo de desparqueo (toggle → llamada API proxy → actualización visual)
+    - Test: flujo de autenticación (carga → búsqueda de token → validación → acceso al widget)
+    - Test: reintento tras error (error de servicio → click reintento → nueva llamada)
+    - _Requisitos: 6.1, 6.2, 1.1, 1.4, 10.3, 10.4_
+
+- [x] 9. Checkpoint final — Verificar que todos los tests pasan
+  - Asegurar que todos los tests pasan, preguntar al usuario si surgen dudas.
+
+## Notas
+
+- Las tareas marcadas con `*` son opcionales y pueden omitirse para un MVP más rápido
+- Cada tarea referencia requisitos específicos para trazabilidad
+- Los checkpoints aseguran validación incremental
+- **Clean Architecture**: Domain no depende de nada, Application depende de Domain, Infrastructure implementa puertos de Domain, Presentation consume Application
+- El servicio mock es intercambiable por la API real cambiando la configuración en `src/infrastructure/config/service-registry.ts`
+- Los tests se organizan espejando la estructura de capas en `__tests__/`
