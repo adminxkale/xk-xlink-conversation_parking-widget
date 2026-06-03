@@ -41,4 +41,3 @@ steps:
       git push github --all
       git push github --tags
     displayName: 'Mirror to GitHub'
-

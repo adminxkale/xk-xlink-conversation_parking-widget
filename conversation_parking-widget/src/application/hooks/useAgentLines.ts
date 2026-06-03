@@ -29,6 +29,7 @@ export function useAgentLines(
     // null means still loading auth — do nothing
     if (agentGroupIds === null || !tenant) return;
 
+    const currentTenant = tenant;
     let cancelled = false;
 
     async function loadLines() {
@@ -40,7 +41,7 @@ export function useAgentLines(
 
         if (agentGroupIds!.length > 0) {
           const settled = await Promise.allSettled(
-            agentGroupIds!.map((gid) => fetchGroupPhones(gid, tenant))
+            agentGroupIds!.map((gid) => fetchGroupPhones(gid, currentTenant))
           );
 
           const fulfilled = settled.filter(
