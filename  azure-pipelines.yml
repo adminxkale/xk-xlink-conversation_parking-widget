@@ -36,7 +36,7 @@ steps:
 
       echo "##[section] Adding GitHub remote and pushing all"
       git remote add github \
-        https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/$(GITHUB_USER)/xk-xlink-media_visualizer-widget.git
+        https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/$(GITHUB_USER)/xk-xlink-conversation_parking-widget.git
 
       git push github --all
       git push github --tags
