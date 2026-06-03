@@ -1,0 +1,43 @@
+trigger:
+  branches:
+    include: ['*']
+
+pr:
+  branches:
+    include: ['*']
+
+variables:
+- group: GitHub-Mirror 
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  # Checkout del repo de Azure y persiste las credenciales en .git/config
+  - checkout: self
+    persistCredentials: true
+    fetchDepth: 0               # baja todo el historial de la rama default
+
+  # Mirror: fetch de todas las ramas y tags
+  - script: |
+      echo "##[section] Fetching all branches and tags from Azure origin"
+      git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+      git fetch origin 'refs/tags/*:refs/tags/*'
+
+      echo "##[section] Creating local branches for each remote branch"
+      for remote in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin/ | grep -v HEAD); do
+        local_branch=${remote#origin/}
+        git branch --track "$local_branch" "$remote" 2>/dev/null || true
+      done
+  # Añade el remote de GitHub y empuja todo
+  - script: |
+      git config --global user.name  "AzureDevOps CI"
+      git config --global user.email "innovacion@xkale.com"
+
+      echo "##[section] Adding GitHub remote and pushing all"
+      git remote add github \
+        https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/$(GITHUB_USER)/xk-xlink-conversation_parking-widget.git
+
+      git push github --all
+      git push github --tags
+    displayName: 'Mirror to GitHub'
