@@ -8,6 +8,7 @@ const defaultState: AuthState = {
   token: null,
   agent: null,
   agentGroupIds: null,
+  tenantId: null,
   error: null,
 };
 

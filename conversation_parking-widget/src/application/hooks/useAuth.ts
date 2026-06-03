@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { AuthState } from "../../domain/entities/auth";
+import type { GenesysCredentials } from "../../domain/entities/tenant";
 import {
   extractToken,
   validateToken,
@@ -15,13 +16,17 @@ const initialState: AuthState = {
   token: null,
   agent: null,
   agentGroupIds: null,
+  tenantId: null,
   error: null,
 };
 
-export function useAuth(): AuthState {
+export function useAuth(credentials: GenesysCredentials | null): AuthState {
   const [state, setState] = useState<AuthState>(initialState);
 
   useEffect(() => {
+    // Wait until credentials are available before attempting auth
+    if (!credentials) return;
+
     let cancelled = false;
 
     async function authenticate() {
@@ -40,13 +45,14 @@ export function useAuth(): AuthState {
               token: null,
               agent: null,
               agentGroupIds: null,
+              tenantId: null,
               error: 'No se pudo obtener el token de autenticación. Verifica la configuración OAuth.',
             });
           }
           return;
         }
         sessionStorage.setItem('auth_redirect_pending', 'true');
-        redirectToLogin();
+        redirectToLogin(credentials!.genesys_client_id, credentials!.environment);
         return;
       }
 
@@ -54,7 +60,7 @@ export function useAuth(): AuthState {
       sessionStorage.removeItem('auth_redirect_pending');
 
       try {
-        const { name, id, groupIds } = await validateToken(token);
+        const { name, id, groupIds } = await validateToken(token, credentials!.environment);
         console.log(`[useAuth] Agent "${name}" (id: ${id}) — groupIds:`, groupIds);
 
         if (cancelled) return;
@@ -65,6 +71,7 @@ export function useAuth(): AuthState {
           token,
           agent: { name, id },
           agentGroupIds: groupIds,
+          tenantId: null,
           error: null,
         });
       } catch (err) {
@@ -79,6 +86,7 @@ export function useAuth(): AuthState {
           token: null,
           agent: null,
           agentGroupIds: null,
+          tenantId: null,
           error: err instanceof Error ? err.message : "Authentication failed",
         });
       }
@@ -89,7 +97,7 @@ export function useAuth(): AuthState {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [credentials]);
 
   return state;
 }

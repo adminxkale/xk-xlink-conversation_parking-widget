@@ -8,9 +8,10 @@ export interface UnparkParams {
   agentName: string;
   queueId: string;
   token: string;
+  tenant: string;
 }
 
 export interface InteractionService {
-  getInteractions(agentId?: string): Promise<Interaction[]>;
+  getInteractions(agentId?: string, tenant?: string): Promise<Interaction[]>;
   unparkInteraction(params: UnparkParams): Promise<Interaction>;
 }

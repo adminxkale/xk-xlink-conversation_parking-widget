@@ -49,8 +49,8 @@ const mockInteractions: Interaction[] = [
 export class MockInteractionService implements InteractionService {
   private interactions: Interaction[] = mockInteractions.map((i) => ({ ...i }));
 
-  async getInteractions(agentId?: string): Promise<Interaction[]> {
-    // Mock: return all interactions regardless of agentId
+  async getInteractions(agentId?: string, tenant?: string): Promise<Interaction[]> {
+    // Mock: return all interactions regardless of agentId/tenant
     if (agentId) {
       return [...this.interactions];
     }

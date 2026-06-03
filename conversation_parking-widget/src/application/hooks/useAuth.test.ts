@@ -1,8 +1,12 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useAuth } from "./useAuth";
+import type { GenesysCredentials } from "../../domain/entities/tenant";
 
 // Mock the genesys-auth adapter
+// Updated signatures (multi-tenant):
+//   redirectToLogin(clientId: string, environment: string): void
+//   validateToken(token: string, environment?: string): Promise<{ name, id, groupIds }>
 vi.mock("../../infrastructure/adapters/genesys-auth.adapter", () => ({
   extractToken: vi.fn(),
   validateToken: vi.fn(),
@@ -22,32 +26,55 @@ const mockValidateToken = vi.mocked(validateToken);
 const mockClearToken = vi.mocked(clearToken);
 const mockRedirectToLogin = vi.mocked(redirectToLogin);
 
+const TEST_CREDENTIALS: GenesysCredentials = {
+  genesys_client_id: "test-client-id",
+  genesys_client_secret: "test-secret",
+  environment: "mypurecloud.com",
+};
+
 describe("useAuth", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("starts in loading state", () => {
+  it("stays in loading state when credentials are null", () => {
     mockExtractToken.mockReturnValue(null);
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(null));
+
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.isAuthenticated).toBe(false);
+    // Should not attempt any auth operations without credentials
+    expect(mockExtractToken).not.toHaveBeenCalled();
+    expect(mockRedirectToLogin).not.toHaveBeenCalled();
+  });
+
+  it("starts in loading state with valid credentials", () => {
+    mockExtractToken.mockReturnValue(null);
+    const { result } = renderHook(() => useAuth(TEST_CREDENTIALS));
 
     expect(result.current.isLoading).toBe(true);
     expect(result.current.isAuthenticated).toBe(false);
   });
 
-  it("redirects to login when no token is found (first attempt)", async () => {
+  it("redirects to login with clientId and environment when no token is found (first attempt)", async () => {
     mockExtractToken.mockReturnValue(null);
-    // Ensure no redirect flag is set
-    sessionStorage.removeItem('auth_redirect_pending');
-    renderHook(() => useAuth());
+
+    renderHook(() => useAuth(TEST_CREDENTIALS));
 
     await waitFor(() => {
-      expect(mockRedirectToLogin).toHaveBeenCalled();
+      expect(mockRedirectToLogin).toHaveBeenCalledTimes(1);
     });
+
+    // Verify the adapter is called with the multi-tenant params
+    expect(mockRedirectToLogin).toHaveBeenCalledWith(
+      TEST_CREDENTIALS.genesys_client_id,
+      TEST_CREDENTIALS.environment
+    );
   });
 
   it("authenticates successfully when token is valid", async () => {
@@ -58,7 +85,7 @@ describe("useAuth", () => {
       groupIds: ["group-a", "group-b"],
     });
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(TEST_CREDENTIALS));
 
     await waitFor(() => {
       expect(result.current.isAuthenticated).toBe(true);
@@ -69,13 +96,18 @@ describe("useAuth", () => {
     expect(result.current.agent).toEqual({ name: "Agent Smith", id: "agent-123" });
     expect(result.current.agentGroupIds).toEqual(["group-a", "group-b"]);
     expect(result.current.error).toBeNull();
+    // Verify validateToken is called with token and environment
+    expect(mockValidateToken).toHaveBeenCalledWith(
+      "valid-token",
+      TEST_CREDENTIALS.environment
+    );
   });
 
   it("clears token and shows error when validation fails (no redirect loop)", async () => {
     mockExtractToken.mockReturnValue("bad-token");
     mockValidateToken.mockRejectedValue(new Error("Token validation failed with status 401"));
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(TEST_CREDENTIALS));
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -93,7 +125,7 @@ describe("useAuth", () => {
     mockExtractToken.mockReturnValue("some-token");
     mockValidateToken.mockRejectedValue("unexpected");
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(TEST_CREDENTIALS));
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);

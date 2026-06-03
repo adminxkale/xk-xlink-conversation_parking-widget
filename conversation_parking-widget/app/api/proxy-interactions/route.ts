@@ -1,18 +1,17 @@
 import { NextResponse } from 'next/server';
 
-const BASE_URL = 'https://1p7yki6h17.execute-api.us-east-1.amazonaws.com/dev';
+const BASE_URL = 'https://api-dev.xlinkapp.cloud';
 
 function buildBasicAuth(): string {
-  const user = process.env.NEXT_PUBLIC_BASIC_AUTH_USER ?? '';
-  //const pass = process.env.NEXT_PUBLIC_BASIC_AUTH_PASS ?? '';
-  //const pass =''
-  const pass = 'fZ9#nLp8@V2cM^wXr1*JqT6$BdKsZ3yRv!Ah7NgX%Um5LjEo^CpWx8#QdFbGtHk9';
+  const user = process.env.AUTH_USER ?? '';
+  const pass = process.env.AUTH_PASS ?? '';
   return 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const agentId = searchParams.get('agent_id');
+  const tenant = searchParams.get('tenant');
 
   if (!agentId) {
     return NextResponse.json(
@@ -21,7 +20,14 @@ export async function GET(request: Request) {
     );
   }
 
-  const targetUrl = `${BASE_URL}/agent/${agentId}`;
+  if (!tenant) {
+    return NextResponse.json(
+      { error: 'Missing required query parameter: tenant' },
+      { status: 400 },
+    );
+  }
+
+  const targetUrl = `${BASE_URL}/session-manager/${tenant}/agent/${agentId}`;
 
   try {
     console.log(`[proxy-interactions] GET → ${targetUrl}`);

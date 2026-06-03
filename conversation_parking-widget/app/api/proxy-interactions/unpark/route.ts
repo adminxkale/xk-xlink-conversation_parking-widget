@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
 
-const BASE_URL = 'https://1p7yki6h17.execute-api.us-east-1.amazonaws.com/dev';
+const BASE_URL = 'https://api-dev.xlinkapp.cloud';
 
 function buildBasicAuth(): string {
-  const user = process.env.NEXT_PUBLIC_BASIC_AUTH_USER ?? '';
-  //const pass = process.env.NEXT_PUBLIC_BASIC_AUTH_PASS ?? '';
-  const pass = 'fZ9#nLp8@V2cM^wXr1*JqT6$BdKsZ3yRv!Ah7NgX%Um5LjEo^CpWx8#QdFbGtHk9';
-  console.log(`[proxy-interactions/unpark] Auth user: "${user}", pass: "${pass}"`);
+  const user = process.env.AUTH_USER ?? '';
+  const pass = process.env.AUTH_PASS ?? '';
   return 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
 }
 
@@ -23,22 +21,20 @@ export async function PUT(request: Request) {
 
   console.log('[proxy-interactions/unpark] Body recibido del cliente:', JSON.stringify(body, null, 2));
 
-  const { business, client, agentId, agentName, queueId } = body as {
+  const { business, client, tenant } = body as {
     business?: string;
     client?: string;
-    agentId?: string;
-    agentName?: string;
-    queueId?: string;
+    tenant?: string;
   };
 
-  if (!business || !client) {
+  if (!business || !client || !tenant) {
     return NextResponse.json(
-      { error: 'Missing required fields: business, client' },
+      { error: 'Missing required fields: business, client, tenant' },
       { status: 400 },
     );
   }
 
-  const targetUrl = `${BASE_URL}/${business}/${client}/`;
+  const targetUrl = `${BASE_URL}/session-manager/${tenant}/${business}/${client}/`;
 
   try {
     const payload = {

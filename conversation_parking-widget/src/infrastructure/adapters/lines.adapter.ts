@@ -57,13 +57,17 @@ export function parseXlinkGroupResponse(
 }
 
 /**
- * Fetch phone numbers associated with a Genesys Cloud group.
- * Calls GET /api/proxy-group-phones?group_id={groupId}
+ * Fetch phone numbers associated with a tenant.
+ * Calls GET /api/proxy-group-phones?tenant={tenant}
  * Each returned line includes the groupId in its groups array.
  */
-export async function fetchGroupPhones(groupId: string): Promise<Line[]> {
+export async function fetchGroupPhones(groupId: string, tenant?: string): Promise<Line[]> {
+  if (!tenant) {
+    throw new Error('Tenant is required to fetch group phones');
+  }
+
   const response = await fetch(
-    `/api/proxy-group-phones?group_id=${encodeURIComponent(groupId)}`
+    `/api/proxy-group-phones?tenant=${encodeURIComponent(tenant)}`
   );
 
   if (!response.ok) {

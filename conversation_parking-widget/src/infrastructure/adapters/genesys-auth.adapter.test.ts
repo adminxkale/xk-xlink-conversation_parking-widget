@@ -6,8 +6,6 @@ describe('genesys-auth.adapter', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    vi.stubEnv('NEXT_PUBLIC_GENESYS_ENVIRONMENT', 'mypurecloud.com');
-    vi.stubEnv('NEXT_PUBLIC_GENESYS_CLIENT_ID', 'test-client-id');
   });
 
   afterEach(() => {
@@ -85,11 +83,43 @@ describe('genesys-auth.adapter', () => {
   });
 
   describe('validateToken', () => {
-    it('returns user data on successful validation', async () => {
+    it('returns user data on successful validation with explicit environment', async () => {
       const mockResponse = {
         name: 'Agent Smith',
         id: 'user-001',
         groups: [{ id: 'group-a' }, { id: 'group-b' }],
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const result = await validateToken('valid-token', 'mypurecloud.com');
+
+      expect(result).toEqual({
+        name: 'Agent Smith',
+        id: 'user-001',
+        groupIds: ['group-a', 'group-b'],
+      });
+      expect(fetch).toHaveBeenCalledWith(
+        'https://api.mypurecloud.com/api/v2/users/me?expand=groups',
+        {
+          headers: {
+            Authorization: 'Bearer valid-token',
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    });
+
+    it('falls back to localStorage environment when not provided', async () => {
+      localStorage.setItem('genesys_environment', 'mypurecloud.com');
+
+      const mockResponse = {
+        name: 'Agent Smith',
+        id: 'user-001',
+        groups: [{ id: 'group-a' }],
       };
 
       global.fetch = vi.fn().mockResolvedValue({
@@ -102,16 +132,11 @@ describe('genesys-auth.adapter', () => {
       expect(result).toEqual({
         name: 'Agent Smith',
         id: 'user-001',
-        groupIds: ['group-a', 'group-b'],
+        groupIds: ['group-a'],
       });
       expect(fetch).toHaveBeenCalledWith(
-        'https://mypurecloud.com/api/v2/users/me?expand=groups',
-        {
-          headers: {
-            Authorization: 'Bearer valid-token',
-            'Content-Type': 'application/json',
-          },
-        }
+        'https://api.mypurecloud.com/api/v2/users/me?expand=groups',
+        expect.any(Object)
       );
     });
 
@@ -121,7 +146,7 @@ describe('genesys-auth.adapter', () => {
         status: 401,
       });
 
-      await expect(validateToken('bad-token')).rejects.toThrow(
+      await expect(validateToken('bad-token', 'mypurecloud.com')).rejects.toThrow(
         'Token validation failed with status 401'
       );
     });
@@ -132,22 +157,20 @@ describe('genesys-auth.adapter', () => {
         json: () => Promise.resolve({ name: 'Solo Agent', id: 'user-002' }),
       });
 
-      const result = await validateToken('valid-token');
+      const result = await validateToken('valid-token', 'mypurecloud.com');
 
       expect(result.groupIds).toEqual([]);
     });
 
-    it('throws when NEXT_PUBLIC_GENESYS_ENVIRONMENT is not set', async () => {
-      vi.stubEnv('NEXT_PUBLIC_GENESYS_ENVIRONMENT', '');
-
+    it('throws when environment is not available (no param and no localStorage)', async () => {
       await expect(validateToken('any-token')).rejects.toThrow(
-        'NEXT_PUBLIC_GENESYS_ENVIRONMENT is not configured'
+        'Genesys environment is not available. Ensure redirectToLogin was called first.'
       );
     });
   });
 
   describe('redirectToLogin', () => {
-    it('redirects to Genesys OAuth login URL', () => {
+    it('redirects to Genesys OAuth login URL with provided clientId and environment', () => {
       const mockLocation = {
         ...originalLocation,
         origin: 'https://myapp.com',
@@ -159,7 +182,7 @@ describe('genesys-auth.adapter', () => {
         writable: true,
       });
 
-      redirectToLogin();
+      redirectToLogin('test-client-id', 'mypurecloud.com');
 
       expect(mockLocation.href).toContain('https://login.mypurecloud.com/oauth/authorize');
       expect(mockLocation.href).toContain('client_id=test-client-id');
@@ -169,12 +192,21 @@ describe('genesys-auth.adapter', () => {
       );
     });
 
-    it('throws when env vars are missing', () => {
-      vi.stubEnv('NEXT_PUBLIC_GENESYS_CLIENT_ID', '');
+    it('stores environment in localStorage before redirecting', () => {
+      const mockLocation = {
+        ...originalLocation,
+        origin: 'https://myapp.com',
+        pathname: '/widget',
+        href: '',
+      };
+      Object.defineProperty(window, 'location', {
+        value: mockLocation,
+        writable: true,
+      });
 
-      expect(() => redirectToLogin()).toThrow(
-        'NEXT_PUBLIC_GENESYS_CLIENT_ID and NEXT_PUBLIC_GENESYS_ENVIRONMENT must be configured'
-      );
+      redirectToLogin('my-client', 'usw2.pure.cloud');
+
+      expect(localStorage.getItem('genesys_environment')).toBe('usw2.pure.cloud');
     });
   });
 

@@ -21,6 +21,7 @@ interface UseInteractionsResult {
 export function useInteractions(
   agentId: string | null,
   token: string | null,
+  tenant: string | null,
   addToast?: (params: { type: ToastType; message: string }) => void
 ): UseInteractionsResult {
   const [interactions, setInteractions] = useState<Interaction[]>([]);
@@ -29,14 +30,14 @@ export function useInteractions(
   const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
 
   const fetchInteractions = useCallback(async () => {
-    if (!agentId) return;
+    if (!agentId || !tenant) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
       const service = getInteractionService();
-      const result = await getInteractions(service, agentId);
+      const result = await getInteractions(service, agentId, tenant);
       setInteractions(result);
     } catch (err) {
       setError(
@@ -45,7 +46,7 @@ export function useInteractions(
     } finally {
       setIsLoading(false);
     }
-  }, [agentId]);
+  }, [agentId, tenant]);
 
   useEffect(() => {
     fetchInteractions();
@@ -69,6 +70,7 @@ export function useInteractions(
           agentName: interaction.agentName ?? '',
           queueId: interaction.queueId ?? '',
           token: token ?? '',
+          tenant: tenant ?? '',
         });
 
         setInteractions((prev) =>

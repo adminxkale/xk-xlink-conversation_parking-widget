@@ -15,15 +15,15 @@ import { ToastProvider } from "./ToastProvider";
 
 function ConversationParkingWidgetInner() {
   const { addToast } = useToastContext();
-  const { agentGroupIds, agent, token } = useAuthContext();
+  const { agentGroupIds, agent, token, tenantId } = useAuthContext();
   const {
     lines,
     selectedLineId,
     setSelectedLineId,
     isLoading: linesLoading,
-  } = useAgentLines(agentGroupIds);
+  } = useAgentLines(agentGroupIds, tenantId);
   const { interactions, isLoading, error, unpark, sendingIds, retry } =
-    useInteractions(agent?.id ?? null, token, addToast);
+    useInteractions(agent?.id ?? null, token, tenantId, addToast);
 
   const { connectionStatus } = useConversationNotifications(
     agent?.id ?? null,

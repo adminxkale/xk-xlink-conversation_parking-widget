@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { POST } from '../../app/api/send-template/route';
 import { GET as getGroupPhones } from '../../app/api/proxy-group-phones/route';
 import { GET as getChannels } from '../../app/api/proxy-channels/route';
@@ -58,15 +58,9 @@ describe('POST /api/send-template', () => {
 
 describe('GET /api/proxy-group-phones', () => {
   const originalFetch = globalThis.fetch;
-  const originalEnv = process.env.XLINK_GROUPS_API_URL;
-
-  beforeEach(() => {
-    process.env.XLINK_GROUPS_API_URL = 'https://fake-xlink.example.com/xlink_groups';
-  });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    process.env.XLINK_GROUPS_API_URL = originalEnv;
     vi.restoreAllMocks();
   });
 
@@ -94,7 +88,7 @@ describe('GET /api/proxy-group-phones', () => {
     expect(Array.isArray(json)).toBe(true);
     expect(json).toEqual(xlinkResponse);
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      'https://fake-xlink.example.com/xlink_groups/grp-42?partitionKey=group_id',
+      'https://zqi6swpat4.execute-api.us-east-1.amazonaws.com/dev/xlink_groups/grp-42?partitionKey=group_id',
     );
   });
 
@@ -105,19 +99,6 @@ describe('GET /api/proxy-group-phones', () => {
     expect(response.status).toBe(400);
     const json = await response.json();
     expect(json.error).toContain('group_id');
-  });
-
-  it('returns 500 when XLINK_GROUPS_API_URL is not configured', async () => {
-    delete process.env.XLINK_GROUPS_API_URL;
-
-    const request = new Request(
-      'http://localhost/api/proxy-group-phones?group_id=grp-42',
-    );
-    const response = await getGroupPhones(request);
-
-    expect(response.status).toBe(500);
-    const json = await response.json();
-    expect(json.error).toContain('XLINK_GROUPS_API_URL');
   });
 
   it('returns 502 when Xlink API returns error', async () => {

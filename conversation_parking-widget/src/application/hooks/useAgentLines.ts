@@ -17,7 +17,8 @@ interface UseAgentLinesResult {
 }
 
 export function useAgentLines(
-  agentGroupIds: string[] | null
+  agentGroupIds: string[] | null,
+  tenant?: string | null
 ): UseAgentLinesResult {
   const [lines, setLines] = useState<Line[]>([]);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
@@ -26,7 +27,7 @@ export function useAgentLines(
 
   useEffect(() => {
     // null means still loading auth — do nothing
-    if (agentGroupIds === null) return;
+    if (agentGroupIds === null || !tenant) return;
 
     let cancelled = false;
 
@@ -39,7 +40,7 @@ export function useAgentLines(
 
         if (agentGroupIds!.length > 0) {
           const settled = await Promise.allSettled(
-            agentGroupIds!.map((gid) => fetchGroupPhones(gid))
+            agentGroupIds!.map((gid) => fetchGroupPhones(gid, tenant))
           );
 
           const fulfilled = settled.filter(
@@ -63,6 +64,9 @@ export function useAgentLines(
 
         console.log('[useAgentLines] Líneas cargadas en el selector:', result);
         setLines(result);
+        if (result.length > 0) {
+          setSelectedLineId(result[0].id);
+        }
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : "Failed to load lines");
@@ -76,7 +80,7 @@ export function useAgentLines(
     return () => {
       cancelled = true;
     };
-  }, [agentGroupIds]);
+  }, [agentGroupIds, tenant]);
 
   return { lines, selectedLineId, setSelectedLineId, isLoading, error };
 }

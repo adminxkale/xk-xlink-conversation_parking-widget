@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'genesys_token';
+const ENVIRONMENT_KEY = 'genesys_environment';
 
 /**
  * Extract access token from URL hash, query params, or localStorage.
@@ -47,17 +48,24 @@ export function extractToken(): string | null {
  * Validate token by calling Genesys Cloud `/api/v2/users/me?expand=groups`.
  * Returns user name, id, and group IDs.
  * Throws if validation fails.
+ *
+ * @param token - OAuth access token
+ * @param environment - Genesys Cloud environment domain (e.g. mypurecloud.com).
+ *   Falls back to localStorage('genesys_environment') if not provided.
  */
 export async function validateToken(
-  token: string
+  token: string,
+  environment?: string
 ): Promise<{ name: string; id: string; groupIds: string[] }> {
-  const environment = process.env.NEXT_PUBLIC_GENESYS_ENVIRONMENT;
-  if (!environment) {
-    throw new Error('NEXT_PUBLIC_GENESYS_ENVIRONMENT is not configured');
+  const resolvedEnvironment =
+    environment ?? (typeof window !== 'undefined' ? localStorage.getItem(ENVIRONMENT_KEY) : null);
+
+  if (!resolvedEnvironment) {
+    throw new Error('Genesys environment is not available. Ensure redirectToLogin was called first.');
   }
 
   const response = await fetch(
-    `https://api.${environment}/api/v2/users/me?expand=groups`,
+    `https://api.${resolvedEnvironment}/api/v2/users/me?expand=groups`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -91,22 +99,19 @@ export async function validateToken(
 
 /**
  * Redirect to Genesys Cloud OAuth login page using implicit grant flow.
+ * Stores the environment in localStorage for use after redirect.
+ *
+ * @param clientId - Genesys Cloud OAuth client ID
+ * @param environment - Genesys Cloud environment domain (e.g. mypurecloud.com)
  */
-export function redirectToLogin(): void {
-  const clientId = process.env.NEXT_PUBLIC_GENESYS_CLIENT_ID;
-  const environment = process.env.NEXT_PUBLIC_GENESYS_ENVIRONMENT;
-
-  if (!clientId || !environment) {
-    throw new Error(
-      'NEXT_PUBLIC_GENESYS_CLIENT_ID and NEXT_PUBLIC_GENESYS_ENVIRONMENT must be configured'
-    );
-  }
+export function redirectToLogin(clientId: string, environment: string): void {
+  localStorage.setItem(ENVIRONMENT_KEY, environment);
 
   const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
   const url =
     `https://login.${environment}/oauth/authorize` +
-    `?client_id=${clientId}` +
-    `&response_type=token` +
+    `?response_type=token` +
+    `&client_id=${clientId}` +
     `&redirect_uri=${redirectUri}`;
 
   window.location.href = url;

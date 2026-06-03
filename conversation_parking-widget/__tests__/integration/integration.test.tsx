@@ -34,6 +34,10 @@ vi.mock("../../src/infrastructure/config/service-registry", () => ({
   getTemplateService: () => ({
     sendTemplate: mockSendTemplate,
   }),
+  getNotificationService: () => ({
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }),
 }));
 
 import {
@@ -160,17 +164,17 @@ describe("Integration tests", () => {
       });
 
       render(
-        <AuthProvider>
+        <AuthProvider credentials={{ genesys_client_id: "test-id", genesys_client_secret: "test-secret", environment: "mypurecloud.com" }}>
           <ConversationParkingWidget />
         </AuthProvider>
       );
 
       // Initially shows loading
-      expect(screen.getByText("Cargando...")).toBeInTheDocument();
+      expect(screen.getByText("Autenticando...")).toBeInTheDocument();
 
       // After auth resolves, the widget renders with the title
       await waitFor(() => {
-        expect(screen.getByText("Conversation Parking")).toBeInTheDocument();
+        expect(screen.getByText("Conversation Parking Hub")).toBeInTheDocument();
       });
     });
   });
@@ -198,7 +202,7 @@ describe("Integration tests", () => {
 
       // Verify interactions load successfully after retry (check unique destination line)
       await waitFor(() => {
-        expect(screen.getByText("+573017654321")).toBeInTheDocument();
+        expect(screen.getByText(/\+573017654321/)).toBeInTheDocument();
       });
 
       // getInteractions was called twice (initial + retry)

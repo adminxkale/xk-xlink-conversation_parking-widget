@@ -1,45 +1,52 @@
 import { NextResponse } from 'next/server';
 
+const BASE_URL = 'https://api-dev.xlinkapp.cloud/management-multitenant/external/management-tables';
+
+function buildBasicAuth(): string {
+  const user = process.env.AUTH_USER ?? '';
+  const pass = process.env.AUTH_PASS ?? '';
+  return 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const groupId = searchParams.get('group_id');
+  const tenant = searchParams.get('tenant');
 
-  if (!groupId) {
+  if (!tenant) {
     return NextResponse.json(
-      { error: 'Missing required query parameter: group_id' },
+      { error: 'Missing required query parameter: tenant' },
       { status: 400 },
     );
   }
 
-  const xlinkBaseUrl = "https://zqi6swpat4.execute-api.us-east-1.amazonaws.com/dev/xlink_groups";
-
-  if (!xlinkBaseUrl) {
-    return NextResponse.json(
-      { error: 'XLINK_GROUPS_API_URL is not configured' },
-      { status: 500 },
-    );
-  }
-
-  const url = `${xlinkBaseUrl}/${groupId}?partitionKey=group_id`;
+  const stage = process.env.STAGE ?? '';
+  const tableName = `xlink-${stage}-group-genesys`;
+  const targetUrl = `${BASE_URL}/${tableName}/${tenant}`;
 
   try {
-    console.log(`[proxy-group-phones] GET → ${url}`);
-    const apiRes = await fetch(url);
+    console.log(`[proxy-group-phones] GET → ${targetUrl}`);
+    const response = await fetch(targetUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': buildBasicAuth(),
+      },
+    });
 
-    if (!apiRes.ok) {
-      console.error(`[proxy-group-phones] ${url} → ${apiRes.status}`);
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown');
+      console.error(`[proxy-group-phones] ${targetUrl} → ${response.status}: ${errorText}`);
       return NextResponse.json(
-        { error: `Xlink Groups API returned status ${apiRes.status}` },
+        { error: `External API error: ${response.status}` },
         { status: 502 },
       );
     }
 
-    const data = await apiRes.json();
-    return NextResponse.json(data, { status: apiRes.status });
+    const data = await response.json();
+    return NextResponse.json(data);
   } catch (err) {
-    console.error(`[proxy-group-phones] Failed to reach ${url}:`, err);
+    console.error(`[proxy-group-phones] Failed to reach ${targetUrl}:`, err);
     return NextResponse.json(
-      { error: 'Failed to connect to Xlink Groups API' },
+      { error: 'Failed to reach external API' },
       { status: 502 },
     );
   }

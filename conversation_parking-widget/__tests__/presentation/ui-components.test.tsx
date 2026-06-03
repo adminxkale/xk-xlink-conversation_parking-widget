@@ -27,7 +27,7 @@ describe('Header', () => {
 
   it('renders the title "Conversation Parking"', () => {
     render(<Header />);
-    expect(screen.getByText('Conversation Parking')).toBeInTheDocument();
+    expect(screen.getByText('Conversation Parking Hub')).toBeInTheDocument();
   });
 });
 
@@ -48,7 +48,7 @@ describe('SkeletonLoader', () => {
 describe('EmptyState', () => {
   it('shows empty state message', () => {
     render(<EmptyState />);
-    expect(screen.getByText('No hay interacciones disponibles')).toBeInTheDocument();
+    expect(screen.getByText('No hay interacciones parqueadas disponibles')).toBeInTheDocument();
   });
 });
 
@@ -128,9 +128,10 @@ describe('LineSelector', () => {
   it('renders all line options', () => {
     render(<LineSelector lines={mockLines} selectedLineId="l1" onSelect={() => {}} isLoading={false} />);
     const options = screen.getAllByRole('option');
-    expect(options).toHaveLength(2);
-    expect(options[0]).toHaveTextContent('Línea 1 (+573001111111)');
-    expect(options[1]).toHaveTextContent('Línea 2 (+573002222222)');
+    expect(options).toHaveLength(3);
+    expect(options[0]).toHaveTextContent('Todas las líneas');
+    expect(options[1]).toHaveTextContent('Línea 1 (+573001111111)');
+    expect(options[2]).toHaveTextContent('Línea 2 (+573002222222)');
   });
 
   it('shows "Cargando líneas..." when loading', () => {

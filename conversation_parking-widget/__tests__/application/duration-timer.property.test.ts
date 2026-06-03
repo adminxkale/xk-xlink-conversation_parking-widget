@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import fc from 'fast-check';
-import { formatDuration } from '../../src/application/hooks/useDurationTimer';
+import { formatCountdown } from '../../src/application/hooks/useDurationTimer';
 
 /**
  * Feature: conversation-parking-widget, Property 5: Cálculo correcto de duración
@@ -48,24 +48,35 @@ describe('Feature: conversation-parking-widget, Property 5: Cálculo correcto de
       fc.property(timestampPairArb, ({ start, now }) => {
         vi.spyOn(Date, 'now').mockReturnValue(now);
 
-        const result = formatDuration(new Date(start).toISOString());
+        const result = formatCountdown(new Date(start).toISOString());
 
-        expect(result).toMatch(HH_MM_SS_REGEX);
+        expect(result.display).toMatch(HH_MM_SS_REGEX);
       }),
       { numRuns: 100 }
     );
   });
 
-  it('numeric value in seconds equals Math.floor((now - start) / 1000)', () => {
+  it('numeric value in seconds equals remaining countdown seconds', () => {
     fc.assert(
       fc.property(timestampPairArb, ({ start, now }) => {
         vi.spyOn(Date, 'now').mockReturnValue(now);
 
-        const result = formatDuration(new Date(start).toISOString());
-        const totalSeconds = parseHHMMSS(result);
-        const expectedSeconds = Math.floor((now - start) / 1000);
+        const result = formatCountdown(new Date(start).toISOString());
+        const totalSeconds = parseHHMMSS(result.display);
 
-        expect(totalSeconds).toBe(expectedSeconds);
+        // formatCountdown calculates a 24-hour countdown from start
+        const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+        const deadline = start + TWENTY_FOUR_HOURS_MS;
+        const remainingMs = deadline - now;
+
+        if (remainingMs <= 0) {
+          expect(totalSeconds).toBe(0);
+          expect(result.isExpired).toBe(true);
+        } else {
+          const expectedSeconds = Math.floor(remainingMs / 1000);
+          expect(totalSeconds).toBe(expectedSeconds);
+          expect(result.isExpired).toBe(false);
+        }
       }),
       { numRuns: 100 }
     );

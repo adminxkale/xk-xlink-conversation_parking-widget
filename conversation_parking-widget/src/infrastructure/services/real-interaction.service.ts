@@ -22,11 +22,11 @@ interface ApiResponse {
 export class RealInteractionService implements InteractionService {
   private interactions: Interaction[] = [];
 
-  async getInteractions(agentId?: string): Promise<Interaction[]> {
-    if (!agentId) return [];
+  async getInteractions(agentId?: string, tenant?: string): Promise<Interaction[]> {
+    if (!agentId || !tenant) return [];
 
     const response = await fetch(
-      `/api/proxy-interactions?agent_id=${encodeURIComponent(agentId)}`
+      `/api/proxy-interactions?agent_id=${encodeURIComponent(agentId)}&tenant=${encodeURIComponent(tenant)}`
     );
 
     if (!response.ok) {
@@ -84,9 +84,7 @@ export class RealInteractionService implements InteractionService {
       body: JSON.stringify({
         business: params.business,
         client: params.client,
-        agentId: params.agentId,
-        agentName: params.agentName,
-        queueId: params.queueId,
+        tenant: params.tenant,
       }),
     });
 

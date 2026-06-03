@@ -2,13 +2,19 @@
 import { ReactNode } from 'react';
 import { AuthContext } from '../providers/AuthContext';
 import { useAuth } from '../../application/hooks/useAuth';
+import type { GenesysCredentials } from '@/src/domain/entities/tenant';
 
 interface AuthProviderProps {
   children: ReactNode;
+  credentials: GenesysCredentials | null;
+  tenantId: string;
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
-  const authState = useAuth();
+export function AuthProvider({ children, credentials, tenantId }: AuthProviderProps) {
+  const authState = useAuth(credentials);
+
+  // Merge tenantId into the auth state
+  const stateWithTenant = { ...authState, tenantId };
 
   if (authState.isLoading) {
     return (
@@ -42,7 +48,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   return (
-    <AuthContext.Provider value={authState}>
+    <AuthContext.Provider value={stateWithTenant}>
       {children}
     </AuthContext.Provider>
   );

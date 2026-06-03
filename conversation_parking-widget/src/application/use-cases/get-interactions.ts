@@ -3,7 +3,8 @@ import { Interaction } from '../../domain/entities/interaction';
 
 export async function getInteractions(
   service: InteractionService,
-  agentId?: string
+  agentId?: string,
+  tenant?: string
 ): Promise<Interaction[]> {
-  return service.getInteractions(agentId);
+  return service.getInteractions(agentId, tenant);
 }
