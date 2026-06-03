@@ -57,11 +57,13 @@ export class RealInteractionService implements InteractionService {
     }
 
     // Step 1: POST to Genesys Cloud to resume conversation (must succeed first)
+    const environment = localStorage.getItem('genesys_environment') || 'mypurecloud.com';
     const conversationResponse = await fetch('/api/proxy-conversations', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${params.token}`,
+        'X-Genesys-Environment': environment,
       },
       body: JSON.stringify({
         queueId: params.queueId,

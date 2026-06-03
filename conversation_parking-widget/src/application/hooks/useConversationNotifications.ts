@@ -25,8 +25,7 @@ export function useConversationNotifications(
     }
 
     const service = getNotificationService();
-    const environment =
-      process.env.NEXT_PUBLIC_GENESYS_ENVIRONMENT || "mypurecloud.com";
+    const environment = localStorage.getItem('genesys_environment') || 'mypurecloud.com';
 
     service.connect({
       token,

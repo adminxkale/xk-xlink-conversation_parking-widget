@@ -22,11 +22,13 @@ export function useQueueNames(
       pendingRef.current.add(queueId);
 
       try {
+        const environment = localStorage.getItem('genesys_environment') || 'mypurecloud.com';
         const response = await fetch(
           `/api/proxy-queues?queueId=${encodeURIComponent(queueId)}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
+              'X-Genesys-Environment': environment,
             },
           }
         );

@@ -34,7 +34,7 @@ export async function PUT(request: Request) {
     );
   }
 
-  const targetUrl = `${BASE_URL}/session-manager/${tenant}/${business}/${client}/`;
+  const targetUrl = `${BASE_URL}/session-manager/${tenant}/${business}/${client}`;
 
   try {
     const payload = {

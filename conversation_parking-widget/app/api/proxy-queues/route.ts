@@ -4,6 +4,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const queueId = searchParams.get('queueId');
   const token = request.headers.get('Authorization');
+  const environment = request.headers.get('X-Genesys-Environment');
 
   if (!queueId) {
     return NextResponse.json(
@@ -19,7 +20,13 @@ export async function GET(request: Request) {
     );
   }
 
-  const environment = process.env.NEXT_PUBLIC_GENESYS_ENVIRONMENT ?? 'mypurecloud.com';
+  if (!environment) {
+    return NextResponse.json(
+      { error: 'Missing X-Genesys-Environment header' },
+      { status: 400 },
+    );
+  }
+
   const targetUrl = `https://api.${environment}/api/v2/routing/queues/${encodeURIComponent(queueId)}`;
 
   try {

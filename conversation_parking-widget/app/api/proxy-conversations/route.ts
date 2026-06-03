@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  // Get the Genesys token from the Authorization header (forwarded from client)
   const authHeader = request.headers.get('Authorization');
   if (!authHeader) {
     return NextResponse.json(
       { error: 'Missing Authorization header' },
       { status: 401 },
+    );
+  }
+
+  const environment = request.headers.get('X-Genesys-Environment');
+  if (!environment) {
+    return NextResponse.json(
+      { error: 'Missing X-Genesys-Environment header' },
+      { status: 400 },
     );
   }
 
@@ -33,25 +40,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const environment = process.env.NEXT_PUBLIC_GENESYS_ENVIRONMENT;
-  if (!environment) {
-    return NextResponse.json(
-      { error: 'NEXT_PUBLIC_GENESYS_ENVIRONMENT is not configured' },
-      { status: 500 },
-    );
-  }
-
   const targetUrl = `https://api.${environment}/api/v2/conversations/messages`;
 
   try {
     const genesysBody = {
       queueId,
       toAddress,
-      toAddressMessengerType: toAddressMessengerType ?? 'open',
+      toAddressMessengerType: 'open',
       useExistingConversation: true,
     };
     console.log(`[proxy-conversations] POST → ${targetUrl}`);
-    console.log(`[proxy-conversations] Body enviado a Genesys:`, JSON.stringify(genesysBody, null, 2));
+
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
