@@ -17,11 +17,11 @@ Implementar soporte multi-tenant en el widget. El widget resuelve dinámicamente
 
 | Ruta proxy | URL externa |
 |------------|-------------|
-| `proxy-tenant?org=X` | `https://api-dev.xlinkapp.cloud/management-multitenant/external/management-tables/tenant/{org}` |
-| `proxy-secret?org=X` | `https://api-dev.xlinkapp.cloud/management-secret/secret?secretId=/xlink/{STAGE}/integration/widget/{org}` |
-| `proxy-group-phones?tenant=X` | `https://api-dev.xlinkapp.cloud/management-multitenant/external/management-tables/xlink-{STAGE}-template-cache/{tenant}` |
-| `proxy-interactions?agent_id=X&tenant=Y` | `https://api-dev.xlinkapp.cloud/session-manager/{tenant}/agent/{agentId}` |
-| `proxy-interactions/unpark` (body: tenant) | `https://api-dev.xlinkapp.cloud/session-manager/{tenant}/{business}/{client}/` |
+| `proxy-tenant?org=X` | `https://api.xlinkapp.cloud/management-multitenant/external/management-tables/tenant/{org}` |
+| `proxy-secret?org=X` | `https://api.xlinkapp.cloud/management-secret/secret?secretId=/xlink/{STAGE}/integration/widget/{org}` |
+| `proxy-group-phones?tenant=X` | `https://api.xlinkapp.cloud/management-multitenant/external/management-tables/xlink-{STAGE}-template-cache/{tenant}` |
+| `proxy-interactions?agent_id=X&tenant=Y` | `https://api.xlinkapp.cloud/session-manager/{tenant}/agent/{agentId}` |
+| `proxy-interactions/unpark` (body: tenant) | `https://api.xlinkapp.cloud/session-manager/{tenant}/{business}/{client}/` |
 
 ---
 
@@ -80,7 +80,7 @@ export interface AuthState {
 ```typescript
 import { NextResponse } from 'next/server';
 
-const BASE_URL = 'https://api-dev.xlinkapp.cloud/management-multitenant/external/management-tables/tenant';
+const BASE_URL = 'https://api.xlinkapp.cloud/management-multitenant/external/management-tables/tenant';
 
 export function buildBasicAuth(user?: string, pass?: string): string {
   const u = user ?? process.env.AUTH_USER ?? '';
@@ -131,7 +131,7 @@ export async function GET(request: Request) {
 ```typescript
 import { NextResponse } from 'next/server';
 
-const BASE_URL = 'https://api-dev.xlinkapp.cloud/management-secret/secret';
+const BASE_URL = 'https://api.xlinkapp.cloud/management-secret/secret';
 
 function buildBasicAuth(): string {
   const user = process.env.AUTH_USER ?? '';
@@ -184,7 +184,7 @@ export async function GET(request: Request) {
 ```typescript
 import { NextResponse } from 'next/server';
 
-const BASE_URL = 'https://api-dev.xlinkapp.cloud/management-multitenant/external/management-tables';
+const BASE_URL = 'https://api.xlinkapp.cloud/management-multitenant/external/management-tables';
 
 function buildBasicAuth(): string {
   const user = process.env.AUTH_USER ?? '';
@@ -228,7 +228,7 @@ export async function GET(request: Request) {
 ```typescript
 import { NextResponse } from 'next/server';
 
-const BASE_URL = 'https://api-dev.xlinkapp.cloud';
+const BASE_URL = 'https://api.xlinkapp.cloud';
 
 function buildBasicAuth(): string {
   const user = process.env.AUTH_USER ?? '';
@@ -277,7 +277,7 @@ export async function GET(request: Request) {
 ```typescript
 import { NextResponse } from 'next/server';
 
-const BASE_URL = 'https://api-dev.xlinkapp.cloud';
+const BASE_URL = 'https://api.xlinkapp.cloud';
 
 function buildBasicAuth(): string {
   const user = process.env.AUTH_USER ?? '';

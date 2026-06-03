@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const BASE_URL = 'https://api-dev.xlinkapp.cloud/management-multitenant/external/management-tables';
+const BASE_URL = 'https://api.xlinkapp.cloud/management-multitenant/external/management-tables';
 
 function buildBasicAuth(): string {
   const user = process.env.AUTH_USER ?? '';
