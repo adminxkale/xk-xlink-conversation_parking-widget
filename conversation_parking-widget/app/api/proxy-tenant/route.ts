@@ -13,6 +13,12 @@ export function buildTenantUrl(org: string): string {
 }
 
 export async function GET(request: Request) {
+  console.log('[ENV CHECK]', {
+    hasUser: !!process.env.AUTH_USER,
+    hasPass: !!process.env.AUTH_PASS,
+    stage: process.env.STAGE,
+  });
+
   const { searchParams } = new URL(request.url);
   const org = searchParams.get('org');
 
