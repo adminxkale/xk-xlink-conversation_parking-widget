@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const BASE_URL = 'https://api-dev.xlinkapp.cloud/management-secret/secret';
+const BASE_URL = 'https://api.xlinkapp.cloud/management-secret/secret';
 
 function buildBasicAuth(): string {
   const user = process.env.AUTH_USER ?? '';
