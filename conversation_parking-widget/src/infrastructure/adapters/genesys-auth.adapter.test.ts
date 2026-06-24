@@ -1,11 +1,18 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { extractToken, validateToken, redirectToLogin, clearToken } from './genesys-auth.adapter';
+
+// Mock the SDK import (no longer needed, but keep mock clean)
+vi.mock('purecloud-platform-client-v2', () => ({}));
+
+import { extractToken, validateToken, redirectToLogin, clearToken, getStoredEnvironment } from './genesys-auth.adapter';
 
 describe('genesys-auth.adapter', () => {
   const originalLocation = window.location;
 
   beforeEach(() => {
-    localStorage.clear();
+    window.localStorage.clear();
   });
 
   afterEach(() => {
@@ -18,67 +25,30 @@ describe('genesys-auth.adapter', () => {
   });
 
   describe('extractToken', () => {
-    it('returns token from URL hash and stores in localStorage', () => {
-      Object.defineProperty(window, 'location', {
-        value: { ...originalLocation, hash: '#access_token=hash-token-123', search: '' },
-        writable: true,
-      });
-
-      const token = extractToken();
-
-      expect(token).toBe('hash-token-123');
-      expect(localStorage.getItem('genesys_token')).toBe('hash-token-123');
-    });
-
-    it('returns token from query params and stores in localStorage', () => {
-      Object.defineProperty(window, 'location', {
-        value: { ...originalLocation, hash: '', search: '?access_token=query-token-456' },
-        writable: true,
-      });
-
-      const token = extractToken();
-
-      expect(token).toBe('query-token-456');
-      expect(localStorage.getItem('genesys_token')).toBe('query-token-456');
-    });
-
-    it('returns token from localStorage when not in URL', () => {
-      Object.defineProperty(window, 'location', {
-        value: { ...originalLocation, hash: '', search: '' },
-        writable: true,
-      });
-      localStorage.setItem('genesys_token', 'stored-token-789');
+    it('returns token from localStorage', () => {
+      window.localStorage.setItem('genesys_token', 'stored-token-789');
 
       const token = extractToken();
 
       expect(token).toBe('stored-token-789');
     });
 
-    it('returns null when no token found anywhere', () => {
-      Object.defineProperty(window, 'location', {
-        value: { ...originalLocation, hash: '', search: '' },
-        writable: true,
-      });
-
+    it('returns null when no token in localStorage', () => {
       const token = extractToken();
 
       expect(token).toBeNull();
     });
+  });
 
-    it('prioritizes hash over query params and localStorage', () => {
-      Object.defineProperty(window, 'location', {
-        value: {
-          ...originalLocation,
-          hash: '#access_token=hash-first',
-          search: '?access_token=query-second',
-        },
-        writable: true,
-      });
-      localStorage.setItem('genesys_token', 'stored-third');
+  describe('getStoredEnvironment', () => {
+    it('returns environment from localStorage', () => {
+      window.localStorage.setItem('genesys_environment', 'mypurecloud.com');
 
-      const token = extractToken();
+      expect(getStoredEnvironment()).toBe('mypurecloud.com');
+    });
 
-      expect(token).toBe('hash-first');
+    it('returns null when no environment stored', () => {
+      expect(getStoredEnvironment()).toBeNull();
     });
   });
 
@@ -114,7 +84,7 @@ describe('genesys-auth.adapter', () => {
     });
 
     it('falls back to localStorage environment when not provided', async () => {
-      localStorage.setItem('genesys_environment', 'mypurecloud.com');
+      window.localStorage.setItem('genesys_environment', 'mypurecloud.com');
 
       const mockResponse = {
         name: 'Agent Smith',
@@ -164,12 +134,12 @@ describe('genesys-auth.adapter', () => {
 
     it('throws when environment is not available (no param and no localStorage)', async () => {
       await expect(validateToken('any-token')).rejects.toThrow(
-        'Genesys environment is not available. Ensure redirectToLogin was called first.'
+        'Genesys environment is not available.'
       );
     });
   });
 
-  describe('redirectToLogin', () => {
+  describe('redirectToLogin (deprecated)', () => {
     it('redirects to Genesys OAuth login URL with provided clientId and environment', () => {
       const mockLocation = {
         ...originalLocation,
@@ -206,17 +176,17 @@ describe('genesys-auth.adapter', () => {
 
       redirectToLogin('my-client', 'usw2.pure.cloud');
 
-      expect(localStorage.getItem('genesys_environment')).toBe('usw2.pure.cloud');
+      expect(window.localStorage.getItem('genesys_environment')).toBe('usw2.pure.cloud');
     });
   });
 
   describe('clearToken', () => {
     it('removes token from localStorage', () => {
-      localStorage.setItem('genesys_token', 'some-token');
+      window.localStorage.setItem('genesys_token', 'some-token');
 
       clearToken();
 
-      expect(localStorage.getItem('genesys_token')).toBeNull();
+      expect(window.localStorage.getItem('genesys_token')).toBeNull();
     });
   });
 });
