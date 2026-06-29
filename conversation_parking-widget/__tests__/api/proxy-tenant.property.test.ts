@@ -68,7 +68,7 @@ describe('Property 3: Tenant resolver URL construction preserves org identifier'
         (org) => {
           const url = buildTenantUrl(org);
           expect(url).toContain(
-            'https://api.xlinkapp.cloud/management-multitenant/external/management-tables/tenant/',
+            'https://api-dev.xlinkapp.cloud/management-multitenant/external/management-tables/tenant/',
           );
         },
       ),
