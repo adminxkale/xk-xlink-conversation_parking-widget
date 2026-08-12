@@ -14,7 +14,7 @@ vi.mock("../../src/infrastructure/adapters/genesys-auth.adapter", () => ({
   extractToken: vi.fn(),
   validateToken: vi.fn(),
   clearToken: vi.fn(),
-  redirectToLogin: vi.fn(),
+  loginWithPKCE: vi.fn(),
 }));
 
 vi.mock("../../src/infrastructure/adapters/lines.adapter", () => ({
@@ -44,7 +44,7 @@ import {
   extractToken,
   validateToken,
   clearToken,
-  redirectToLogin,
+  loginWithPKCE,
 } from "../../src/infrastructure/adapters/genesys-auth.adapter";
 import {
   fetchGroupPhones,
@@ -54,7 +54,7 @@ import {
 const mockExtractToken = vi.mocked(extractToken);
 const mockValidateToken = vi.mocked(validateToken);
 const mockClearToken = vi.mocked(clearToken);
-const mockRedirectToLogin = vi.mocked(redirectToLogin);
+const mockLoginWithPKCE = vi.mocked(loginWithPKCE);
 const mockFetchGroupPhones = vi.mocked(fetchGroupPhones);
 const mockFetchChannels = vi.mocked(fetchChannels);
 
