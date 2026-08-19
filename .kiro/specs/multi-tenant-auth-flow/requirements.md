@@ -16,7 +16,7 @@ El flujo añade tres pasos previos a la autenticación OAuth existente: extraer 
 - **Genesys_Credentials**: Conjunto de datos necesarios para autenticar contra Genesys Cloud: `genesys_client_id`, `genesys_client_secret` y `environment`.
 - **Auth_Flow**: Secuencia completa de pasos desde la carga del widget hasta la obtención de un token OAuth válido de Genesys Cloud.
 - **Basic_Auth**: Esquema de autenticación HTTP Basic usado para las llamadas server-side a la API de Xlink, construido a partir de AUTH_USER y AUTH_PASS.
-- **Xlink_API**: API REST de la plataforma Xlink en `https://api-dev.xlinkapp.cloud`.
+- **Xlink_API**: API REST de la plataforma Xlink en `https://api.xlinkapp.cloud`.
 
 ## Requirements
 
@@ -39,7 +39,7 @@ El flujo añade tres pasos previos a la autenticación OAuth existente: extraer 
 
 #### Acceptance Criteria
 
-1. WHEN the Widget has a valid organization identifier, THE Tenant_Resolver SHALL make a GET request to `https://api-dev.xlinkapp.cloud/management-multitenant/external/management-tables/tenant/{org}` where `{org}` is the organization identifier.
+1. WHEN the Widget has a valid organization identifier, THE Tenant_Resolver SHALL make a GET request to `https://api.xlinkapp.cloud/management-multitenant/external/management-tables/tenant/{org}` where `{org}` is the organization identifier.
 2. THE Tenant_Resolver SHALL authenticate the request using Basic_Auth constructed from server-side environment variables AUTH_USER and AUTH_PASS.
 3. WHEN the Xlink_API returns a successful response containing a `tenant_id` field, THE Tenant_Resolver SHALL extract the `tenant_id` and return it to the client.
 4. IF the Xlink_API returns a successful response but the `tenant_id` field is absent or empty, THEN THE Tenant_Resolver SHALL return an error response with status 502 indicating that tenant resolution failed.
@@ -52,7 +52,7 @@ El flujo añade tres pasos previos a la autenticación OAuth existente: extraer 
 
 #### Acceptance Criteria
 
-1. WHEN the Widget has a valid Tenant_ID, THE Secret_Resolver SHALL make a GET request to `https://api-dev.xlinkapp.cloud/management-secret/secret?secretId=/xlink/{STAGE}/integration/widget/{tenantId}` where `{STAGE}` is the deployment stage from server-side environment variable STAGE and `{tenantId}` is the resolved tenant identifier.
+1. WHEN the Widget has a valid Tenant_ID, THE Secret_Resolver SHALL make a GET request to `https://api.xlinkapp.cloud/management-secret/secret?secretId=/xlink/{STAGE}/integration/widget/{tenantId}` where `{STAGE}` is the deployment stage from server-side environment variable STAGE and `{tenantId}` is the resolved tenant identifier.
 2. THE Secret_Resolver SHALL authenticate the request using Basic_Auth constructed from server-side environment variables AUTH_USER and AUTH_PASS.
 3. WHEN the Xlink_API returns a successful response, THE Secret_Resolver SHALL return the response body containing `genesys_client_id`, `genesys_client_secret`, and `environment` fields.
 4. IF the Xlink_API returns a successful response but the required credential fields are absent, THEN THE Secret_Resolver SHALL return an error response with status 502 indicating that credential retrieval failed.

@@ -99,7 +99,7 @@ export interface TenantResolutionState {
 
 - Receives query param: `org`
 - Constructs Basic Auth from `AUTH_USER` and `AUTH_PASS` env vars (server-side only)
-- Makes GET to: `https://api-dev.xlinkapp.cloud/management-multitenant/external/management-tables/tenant/{org}`
+- Makes GET to: `https://api.xlinkapp.cloud/management-multitenant/external/management-tables/tenant/{org}`
 - Validates response contains `tenant_id`
 - Returns `{ tenant_id }` on success
 - Returns 400 if `org` missing, 502 if upstream fails or `tenant_id` absent
@@ -110,7 +110,7 @@ export interface TenantResolutionState {
 
 - Receives query param: `tenantId`
 - Constructs Basic Auth from `AUTH_USER` and `AUTH_PASS` env vars (server-side only)
-- Makes GET to: `https://api-dev.xlinkapp.cloud/management-secret/secret?secretId=/xlink/{STAGE}/integration/widget/{tenantId}`
+- Makes GET to: `https://api.xlinkapp.cloud/management-secret/secret?secretId=/xlink/{STAGE}/integration/widget/{tenantId}`
 - `STAGE` comes from server-side env var `STAGE`
 - Validates response contains required credential fields
 - Returns only `{ genesys_client_id, genesys_client_secret, environment }` (filtered)
@@ -285,7 +285,7 @@ decode(header.replace('Basic ', '')) === user + ':' + pass
 For any non-empty org string, the URL constructed by the Tenant_Resolver contains the org value as the last path segment.
 
 ```
-url = `https://api-dev.xlinkapp.cloud/management-multitenant/external/management-tables/tenant/${org}`
+url = `https://api.xlinkapp.cloud/management-multitenant/external/management-tables/tenant/${org}`
 url.endsWith('/' + org) === true
 ```
 
