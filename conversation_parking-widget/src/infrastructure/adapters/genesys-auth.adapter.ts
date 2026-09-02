@@ -8,6 +8,16 @@
 const TOKEN_KEY = 'genesys_token';
 const ENVIRONMENT_KEY = 'genesys_environment';
 const CODE_VERIFIER_KEY = 'pkce_code_verifier';
+const REFRESH_TOKEN_KEY = 'genesys_refresh_token';
+const TOKEN_EXPIRY_KEY = 'genesys_token_expiry'; // epoch ms en el que el access_token expira
+const CLIENT_ID_KEY = 'genesys_client_id';
+
+/**
+ * Margen de seguridad (ms) antes de la expiración real para considerar el token
+ * "por expirar" y renovarlo de forma proactiva. Evita usar un token que caduca
+ * en mitad de una request.
+ */
+const TOKEN_REFRESH_MARGIN_MS = 5 * 60_000; // 5 minutos
 
 /** Timeout para esperar la respuesta del popup (ms) */
 const POPUP_TIMEOUT_MS = 120_000; // 2 minutos
@@ -44,13 +54,28 @@ function base64UrlEncode(buffer: Uint8Array): string {
 // Intercambio de code por token
 // ---------------------------------------------------------------------------
 
+/** Respuesta cruda del endpoint /oauth/token de Genesys. */
+interface TokenResponse {
+  access_token: string;
+  token_type?: string;
+  /** Segundos hasta que el access_token expire. */
+  expires_in?: number;
+  /**
+   * Token de refresco. Genesys solo lo emite para clientes con Code Authorization
+   * (con secret) o cuando se solicita el scope `offline_access`. Con PKCE puro
+   * puede no venir — el código maneja ambos casos.
+   */
+  refresh_token?: string;
+  error?: string;
+}
+
 async function exchangeCodeForToken(
   code: string,
   clientId: string,
   redirectUri: string,
   codeVerifier: string,
   environment: string,
-): Promise<string> {
+): Promise<TokenResponse> {
   const tokenUrl = `https://login.${environment}/oauth/token`;
 
   const body = new URLSearchParams({
@@ -72,13 +97,78 @@ async function exchangeCodeForToken(
     throw new Error(`Token exchange failed (${response.status}): ${errorText}`);
   }
 
-  const data = await response.json();
+  const data: TokenResponse = await response.json();
 
   if (!data.access_token) {
     throw new Error('No access_token in token response');
   }
 
-  return data.access_token;
+  return data;
+}
+
+/**
+ * Intercambia un refresh_token por un nuevo access_token (grant_type=refresh_token).
+ * No requiere popup ni interacción del usuario.
+ */
+async function exchangeRefreshToken(
+  refreshToken: string,
+  clientId: string,
+  environment: string,
+): Promise<TokenResponse> {
+  const tokenUrl = `https://login.${environment}/oauth/token`;
+
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    client_id: clientId,
+  });
+
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Token refresh failed (${response.status}): ${errorText}`);
+  }
+
+  const data: TokenResponse = await response.json();
+
+  if (!data.access_token) {
+    throw new Error('No access_token in refresh response');
+  }
+
+  return data;
+}
+
+/**
+ * Guarda en localStorage el resultado de un token exchange/refresh.
+ * Calcula el timestamp absoluto de expiración a partir de expires_in.
+ */
+function persistTokenResponse(data: TokenResponse): void {
+  localStorage.setItem(TOKEN_KEY, data.access_token);
+
+  if (typeof data.expires_in === 'number' && data.expires_in > 0) {
+    const expiryMs = Date.now() + data.expires_in * 1000;
+    localStorage.setItem(TOKEN_EXPIRY_KEY, String(expiryMs));
+  } else {
+    localStorage.removeItem(TOKEN_EXPIRY_KEY);
+  }
+
+  if (data.refresh_token) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+  }
+}
+
+/** true si hay expiración guardada y el token ya caducó (o está dentro del margen). */
+function isTokenExpiring(): boolean {
+  const expiryRaw = localStorage.getItem(TOKEN_EXPIRY_KEY);
+  if (!expiryRaw) return false;
+  const expiryMs = Number(expiryRaw);
+  if (!Number.isFinite(expiryMs)) return false;
+  return Date.now() >= expiryMs - TOKEN_REFRESH_MARGIN_MS;
 }
 
 // ---------------------------------------------------------------------------
@@ -216,19 +306,47 @@ async function _doLoginWithPKCE(
   environment: string,
 ): Promise<{ name: string; id: string; groupIds: string[]; token: string }> {
   localStorage.setItem(ENVIRONMENT_KEY, environment);
+  localStorage.setItem(CLIENT_ID_KEY, clientId);
 
-  // CASO 1: Hay token guardado → validar
+  // CASO 1: Hay token guardado
   const storedToken = localStorage.getItem(TOKEN_KEY);
   if (storedToken) {
+    // 1a. Si está por expirar y tenemos refresh_token, renovar sin popup.
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (refreshToken && isTokenExpiring()) {
+      try {
+        const refreshed = await exchangeRefreshToken(refreshToken, clientId, environment);
+        persistTokenResponse(refreshed);
+        const userInfo = await validateToken(refreshed.access_token, environment);
+        return { ...userInfo, token: refreshed.access_token };
+      } catch {
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+      }
+    }
+
+    // 1b. Validar el token actual contra el API.
     try {
       const userInfo = await validateToken(storedToken, environment);
       return { ...userInfo, token: storedToken };
     } catch {
-      localStorage.removeItem(TOKEN_KEY);
+      // Token inválido/expirado. Último intento: refresh si aún hay refresh_token.
+      const rt = localStorage.getItem(REFRESH_TOKEN_KEY);
+      if (rt) {
+        try {
+          const refreshed = await exchangeRefreshToken(rt, clientId, environment);
+          persistTokenResponse(refreshed);
+          const userInfo = await validateToken(refreshed.access_token, environment);
+          return { ...userInfo, token: refreshed.access_token };
+        } catch {
+          clearToken();
+        }
+      } else {
+        clearToken();
+      }
     }
   }
 
-  // CASO 2: No hay token → iniciar flujo PKCE via popup
+  // CASO 2: No hay token válido → iniciar flujo PKCE via popup
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await computeCodeChallenge(codeVerifier);
 
@@ -246,7 +364,7 @@ async function _doLoginWithPKCE(
 
   const authCode = await authenticateViaPopup(authUrl);
 
-  const token = await exchangeCodeForToken(
+  const tokenResponse = await exchangeCodeForToken(
     authCode,
     clientId,
     popupRedirectUri,
@@ -255,10 +373,49 @@ async function _doLoginWithPKCE(
   );
 
   sessionStorage.removeItem(CODE_VERIFIER_KEY);
-  localStorage.setItem(TOKEN_KEY, token);
+  persistTokenResponse(tokenResponse);
 
-  const userInfo = await validateToken(token, environment);
-  return { ...userInfo, token };
+  const userInfo = await validateToken(tokenResponse.access_token, environment);
+  return { ...userInfo, token: tokenResponse.access_token };
+}
+
+/** Lock para evitar refrescos concurrentes disparados por múltiples requests. */
+let refreshInProgress: Promise<string> | null = null;
+
+/**
+ * Devuelve un access_token válido, renovándolo con el refresh_token si está por
+ * expirar. Úsalo justo antes de llamar a las APIs de Genesys para no quedarte con
+ * un token caducado en medio de la sesión.
+ */
+export async function getValidToken(): Promise<string> {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    throw new Error('No hay sesión de Genesys activa.');
+  }
+
+  const environment = localStorage.getItem(ENVIRONMENT_KEY);
+  const clientId = localStorage.getItem(CLIENT_ID_KEY);
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+  if (!refreshToken || !environment || !clientId || !isTokenExpiring()) {
+    return token;
+  }
+
+  if (refreshInProgress) {
+    return refreshInProgress;
+  }
+
+  refreshInProgress = (async () => {
+    try {
+      const refreshed = await exchangeRefreshToken(refreshToken, clientId, environment);
+      persistTokenResponse(refreshed);
+      return refreshed.access_token;
+    } finally {
+      refreshInProgress = null;
+    }
+  })();
+
+  return refreshInProgress;
 }
 
 // ---------------------------------------------------------------------------
@@ -287,5 +444,9 @@ export function getStoredEnvironment(): string | null {
 export function clearToken(): void {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ENVIRONMENT_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(TOKEN_EXPIRY_KEY);
+    localStorage.removeItem(CLIENT_ID_KEY);
   }
 }
